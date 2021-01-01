@@ -14,7 +14,7 @@ You will need to have Ruby and docker-compose installed.
 
 ```
 bundle install
-bundle exec ruby app.rb
+bundle exec rake
 ```
 
 The terminal output is very noisy but minitest will make it clear

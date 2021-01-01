@@ -3,21 +3,28 @@ require 'chirpstack_api'
 require 'securerandom'
 require 'logger'
 require 'ldl'
+
 require_relative "chirpstack"
 
 require_relative 'test/confirmed_test'
 require_relative 'test/unconfirmed_test'
 require_relative 'test/otaa_test'
 
-puts Minitest::Runnable.runnables
+task :default => [:test]
 
-$logger = Logger.new(STDOUT)
-$logger.formatter = LDL::LOG_FORMATTER
+task :test do
 
-ChirpStack.run(logger: $logger) do |cs|
+  #puts Minitest::Runnable.runnables
 
-  $cs = cs
+  $logger = Logger.new(STDOUT)
+  $logger.formatter = LDL::LOG_FORMATTER
 
-  Minitest.run
+  ChirpStack.run(logger: $logger) do |cs|
+
+    $cs = cs
+
+    Minitest.run
+
+  end
 
 end
