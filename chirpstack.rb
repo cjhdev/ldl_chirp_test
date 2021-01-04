@@ -12,6 +12,9 @@ class ChirpStack
   # magical barely documented address that maps to localhost from inside docker compose
   LOCALHOST = "172.17.0.1"
 
+  AS_PORT = 8001
+  JS_PORT = 8003
+
   COMPOSE_FILE = File.expand_path(File.join(File.dirname(__FILE__), "compose.yml"))
 
   def self.run(**opts)
@@ -36,13 +39,16 @@ class ChirpStack
     @logger = opts[:logger]||NULL_LOGGER
     @mutex = Mutex.new
 
-    #@config = YAML.load(COMPOSE_FILE)
+    @stubs = {}
 
-    @stub = NS::NetworkServerService::Stub.new('localhost:8000', :this_channel_is_insecure)
-    @js = JoinServer.new(logger: @logger)
+    @stubs[:EU_863_870] = NS::NetworkServerService::Stub.new('localhost:9000', :this_channel_is_insecure)
+    @stubs[:US_902_928] = NS::NetworkServerService::Stub.new('localhost:9001', :this_channel_is_insecure)
+    @stubs[:AU_915_928] = NS::NetworkServerService::Stub.new('localhost:9002', :this_channel_is_insecure)
+
+    @js = JoinServer.new(logger: @logger, port: JS_PORT)
 
     @as = GRPC::RpcServer.new
-    @as.add_http2_port('0.0.0.0:9001', :this_port_is_insecure)
+    @as.add_http2_port("0.0.0.0:#{AS_PORT}", :this_port_is_insecure)
     @as.handle(AppServer.new)
 
     @pid = nil
@@ -91,7 +97,7 @@ class ChirpStack
     start_as()
     @js.start
     start_docker()
-    add_routing_profile()
+    add_routing_profiles()
   end
 
   def stop
@@ -100,21 +106,26 @@ class ChirpStack
     @js.stop
   end
 
-  def add_routing_profile
+  def add_routing_profiles
     with_mutex do
-      @stub.create_routing_profile(
-        NS::CreateRoutingProfileRequest.new(
-          routing_profile: NS::RoutingProfile.new(
+      @stubs.each do |region,stub|
+        stub.create_routing_profile(
+          NS::CreateRoutingProfileRequest.new(
+            routing_profile: NS::RoutingProfile.new(
               id: "default",
-              as_id: "#{LOCALHOST}:9001"
+              as_id: "#{LOCALHOST}:#{AS_PORT}"
             )
+          )
         )
-      )
+
+        #sleep 1
+
+      end
     end
   end
 
-  def get_version
-    @stub.get_version(Google::Protobuf::Empty.new)
+  def get_version(scenario)
+    stub(scenario).get_version(Google::Protobuf::Empty.new)
   end
 
   def add_scenario(scenario, **opts)
@@ -135,7 +146,7 @@ class ChirpStack
         mac_version: "1.0.2",
         reg_params_revision: "B",
         supports_32bit_f_cnt: true,
-        max_eirp: 14,
+        max_eirp: 16,
         max_duty_cycle: 100,
         supports_join: true,
         rf_region: "EU868"
@@ -156,10 +167,10 @@ class ChirpStack
 
       # add them
 
-      @stub.create_device_profile(NS::CreateDeviceProfileRequest.new(device_profile: device_profile))
-      @stub.create_service_profile(NS::CreateServiceProfileRequest.new(service_profile: service_profile))
-      @stub.create_gateway(NS::CreateGatewayRequest.new(gateway: gateway))
-      @stub.create_device(NS::CreateDeviceRequest.new(device: device))
+      stub(scenario).create_device_profile(NS::CreateDeviceProfileRequest.new(device_profile: device_profile))
+      stub(scenario).create_service_profile(NS::CreateServiceProfileRequest.new(service_profile: service_profile))
+      stub(scenario).create_gateway(NS::CreateGatewayRequest.new(gateway: gateway))
+      stub(scenario).create_device(NS::CreateDeviceRequest.new(device: device))
 
       @js.add_scenario(scenario)
 
@@ -173,22 +184,22 @@ class ChirpStack
     with_mutex do
 
       begin
-        @stub.delete_device(NS::DeleteDeviceRequest.new(dev_eui: scenario.device.dev_eui))
+        stub(scenario).delete_device(NS::DeleteDeviceRequest.new(dev_eui: scenario.device.dev_eui))
       rescue
       end
 
       begin
-        @stub.delete_device_profile(NS::DeleteDeviceProfileRequest.new(id: scenario.device.dev_eui))
+        stub(scenario).delete_device_profile(NS::DeleteDeviceProfileRequest.new(id: scenario.device.dev_eui))
       rescue
       end
 
       begin
-        @stub.delete_service_profile(NS::DeleteServiceProfileRequest.new(id: scenario.device.dev_eui))
+        stub(scenario).delete_service_profile(NS::DeleteServiceProfileRequest.new(id: scenario.device.dev_eui))
       rescue
       end
 
       begin
-        @stub.delete_gateway(NS::DeleteGatewayRequest.new(id: scenario.gw.eui))
+        stub(scenario).delete_gateway(NS::DeleteGatewayRequest.new(id: scenario.gw.eui))
       rescue
       end
 
@@ -199,6 +210,10 @@ class ChirpStack
     end
   end
 
+  def stub(scenario)
+    @stubs[scenario.region]
+  end
+
   def with_mutex
     @mutex.synchronize do
       yield
@@ -206,10 +221,11 @@ class ChirpStack
   end
 
   private :with_mutex,
-    :add_routing_profile,
+    :add_routing_profiles,
     :start_docker,
     :stop_docker,
     :start_as,
-    :stop_as
+    :stop_as,
+    :stub
 
 end

@@ -6,7 +6,7 @@ describe "otaa" do
 
   let(:cycle_time){9}    # average time it takes to do otaa tx+rx cycle
   let(:dither){10}
-  let(:scenario){ LDL::Scenario.new(logger: $logger, otaa_dither: dither) }
+  let(:scenario){ LDL::Scenario.new(logger: $logger, otaa_dither: dither, region: $region) }
 
   before do
 

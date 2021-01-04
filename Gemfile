@@ -9,3 +9,5 @@ gem "sinatra"
 gem "sinatra-contrib"
 
 gem "minitest"
+
+gem "rake"

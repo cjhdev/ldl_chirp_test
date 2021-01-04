@@ -1,0 +1,23 @@
+[postgresql]
+dsn="postgres://chirpstack_ns:chirpstack_ns@postgresql/au915?sslmode=disable"
+
+[redis]
+url="redis://redis:6379"
+
+[network_server]
+net_id="000002"
+
+[network_server.band]
+name="AU915"
+
+  [network_server.network_settings]
+  enabled_uplink_channels=[0, 1, 2, 3, 4, 5, 6, 7, 64]
+
+[network_server.gateway.backend.mqtt]
+server="tcp://mosquitto:1883"
+
+[join_server.default]
+server="http://chirpstack-application-server:8003"
+
+[network_server.api]
+bind="0.0.0.0:8000"

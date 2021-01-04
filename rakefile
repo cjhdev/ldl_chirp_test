@@ -6,9 +6,9 @@ require 'ldl'
 
 require_relative "chirpstack"
 
-require_relative 'test/confirmed_test'
+#require_relative 'test/confirmed_test'
 require_relative 'test/unconfirmed_test'
-require_relative 'test/otaa_test'
+#require_relative 'test/otaa_test'
 
 task :default => [:test]
 
@@ -18,6 +18,9 @@ task :test do
 
   $logger = Logger.new(STDOUT)
   $logger.formatter = LDL::LOG_FORMATTER
+
+  #$region = :EU_863_870
+  $region = :US_902_928
 
   ChirpStack.run(logger: $logger) do |cs|
 

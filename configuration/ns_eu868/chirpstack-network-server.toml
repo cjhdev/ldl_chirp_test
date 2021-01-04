@@ -1,11 +1,5 @@
-# See https://www.chirpstack.io/network-server/install/config/ for a full
-# configuration example and documentation.
-#
-# This file is for the EU868 band. See the examples/ folder for more
-# configuration examples.
-
 [postgresql]
-dsn="postgres://chirpstack_ns:chirpstack_ns@postgresql/chirpstack_ns?sslmode=disable"
+dsn="postgres://chirpstack_ns:chirpstack_ns@postgresql/eu868?sslmode=disable"
 
 [redis]
 url="redis://redis:6379"
@@ -47,7 +41,8 @@ name="EU868"
 server="tcp://mosquitto:1883"
 
 [join_server.default]
-server="http://chirpstack-application-server:8003"
+server="http://172.17.0.1:8003"
 
-[geolocation_server]
-server="chirpstack-geolocation-server:8005"
+[network_server.api]
+# ip:port to bind the api server
+bind="0.0.0.0:8000"
