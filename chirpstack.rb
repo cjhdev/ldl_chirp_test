@@ -143,13 +143,12 @@ class ChirpStack
 
       device_profile = NS::DeviceProfile.new(
         id: scenario.device.dev_eui,
-        mac_version: "1.0.2",
+        mac_version: "1.0.3",
         reg_params_revision: "B",
         supports_32bit_f_cnt: true,
         max_eirp: 16,
         max_duty_cycle: 100,
-        supports_join: true,
-        rf_region: "EU868"
+        supports_join: true
       )
 
       gateway = NS::Gateway.new(
@@ -220,12 +219,23 @@ class ChirpStack
     end
   end
 
+  REGION_TO_CS = {
+    EU_863_870: "EU868",
+    US_902_928: "US915",
+    AU_915_928: "AU915",
+  }
+
+  def region_to_cs(region)
+    REGION_TO_CS[region]
+  end
+
   private :with_mutex,
     :add_routing_profiles,
     :start_docker,
     :stop_docker,
     :start_as,
     :stop_as,
-    :stub
+    :stub,
+    :region_to_cs
 
 end

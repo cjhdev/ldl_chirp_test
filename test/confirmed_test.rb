@@ -4,7 +4,7 @@ require 'ldl'
 
 describe "confirmed" do
 
-  let(:scenario){ LDL::Scenario.new(logger: $logger, otaa_dither: 0, region: $region) }
+  let(:scenario){ LDL::Scenario.new(logger: $logger, otaa_dither: 0, region: $regions.sample) }
 
   before do
 

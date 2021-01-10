@@ -17,7 +17,7 @@ name="AU915"
 server="tcp://mosquitto:1883"
 
 [join_server.default]
-server="http://chirpstack-application-server:8003"
+server="http://172.17.0.1:8003"
 
 [network_server.api]
 bind="0.0.0.0:8000"
