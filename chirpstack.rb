@@ -117,9 +117,6 @@ class ChirpStack
             )
           )
         )
-
-        #sleep 1
-
       end
     end
   end
@@ -172,6 +169,8 @@ class ChirpStack
       stub(scenario).create_device(NS::CreateDeviceRequest.new(device: device))
 
       @js.add_scenario(scenario)
+
+      sleep 1
 
       self
 

@@ -8,14 +8,15 @@ describe "otaa" do
 
     describe(region) do
 
-      let(:cycle_time){9}    # average time it takes to do otaa tx+rx cycle
-      let(:dither){10}
-      let(:scenario){ LDL::Scenario.new(logger: $logger, otaa_dither: dither, region: region) }
+      let(:cycle_time){10}    # average time it takes to do otaa tx+rx cycle
+      let(:dither){0}
+      let(:scenario){ LDL::Scenario.new(logger: $logger, region: region, otaa_dither: dither, port: $port) }
 
       before do
 
         $cs.add_scenario(scenario)
         scenario.start
+        sleep 1
 
       end
 
@@ -52,12 +53,11 @@ describe "otaa" do
 
       end
 
-      describe "fail multiple attempts before succeeding" do
+      describe "succeed on second attempt" do
 
-        let(:attempts){[0,0,0,1]}
+        let(:attempts){[0,1]}
 
         before do
-          skip if scenario.region == :US_902_928
           scenario.device.reliability = attempts.dup
         end
 

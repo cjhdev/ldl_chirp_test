@@ -2,15 +2,6 @@ version: "3.6"
 
 services:
 
-  ns_us915:
-    image: chirpstack/chirpstack-network-server:3
-    depends_on:
-        - postgresql
-    ports:
-        - 9001:8000
-    volumes:
-      - ./configuration/ns_us915:/etc/chirpstack-network-server
-
   ns_eu868:
     image: chirpstack/chirpstack-network-server:3
     depends_on:
@@ -19,6 +10,15 @@ services:
         - 9000:8000
     volumes:
       - ./configuration/ns_eu868:/etc/chirpstack-network-server
+
+  ns_us915:
+    image: chirpstack/chirpstack-network-server:3
+    depends_on:
+        - postgresql
+    ports:
+        - 9001:8000
+    volumes:
+      - ./configuration/ns_us915:/etc/chirpstack-network-server
 
   ns_au915:
     image: chirpstack/chirpstack-network-server:3
@@ -32,7 +32,7 @@ services:
   bridge:
     image: chirpstack/chirpstack-gateway-bridge:3
     ports:
-      - 1700:1700/udp
+      - 1800:1700/udp
     volumes:
       - ./configuration/bridge:/etc/chirpstack-gateway-bridge
 
@@ -44,7 +44,19 @@ services:
     volumes:
       - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
 
-  redis:
+  # network servers ruin the cache for each other so they need
+  # their own dedicated instance
+  redis_eu868:
+    image: redis:5-alpine
+    volumes:
+      - redisdata:/data
+
+  redis_us915:
+    image: redis:5-alpine
+    volumes:
+      - redisdata:/data
+
+  redis_au915:
     image: redis:5-alpine
     volumes:
       - redisdata:/data

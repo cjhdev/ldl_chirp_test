@@ -19,10 +19,13 @@ task :test do
   $logger << Logger.new(STDOUT, formatter: LDL::LOG_FORMATTER)
   $logger << Logger.new("run.log", formatter: LDL::LOG_FORMATTER)
 
+  $port = 1800
+
   $regions = [
 
-    :EU_863_870
-    #:US_902_928
+    :EU_863_870,
+    :US_902_928,
+    :AU_915_928
   ]
 
   require_relative 'test/confirmed_test'
@@ -33,7 +36,7 @@ task :test do
 
     $cs = cs
 
-    Minitest.run
+    Minitest.run ["--verbose"]
 
   end
 

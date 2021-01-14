@@ -2,7 +2,7 @@
 dsn="postgres://chirpstack_ns:chirpstack_ns@postgresql/eu868?sslmode=disable"
 
 [redis]
-url="redis://redis:6379"
+url="redis://redis_eu868:6379"
 
 [network_server]
 net_id="000000"

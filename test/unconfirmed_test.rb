@@ -4,68 +4,76 @@ require 'ldl'
 
 describe "unconfirmed" do
 
-  let(:scenario){ LDL::Scenario.new(logger: $logger, otaa_dither: 0, region: $regions.sample) }
+  $regions.each do |region|
 
-  before do
+    describe(region) do
 
-    $cs.add_scenario(scenario)
-    scenario.start
-    scenario.device.otaa(timeout: 30)
+      let(:scenario){ LDL::Scenario.new(logger: $logger, otaa_dither: 0, region: region, port: $port) }
 
-  end
+      before do
 
-  after do
+        $cs.add_scenario(scenario)
+        scenario.start
+        scenario.device.otaa(timeout: 30)
 
-    scenario.stop
-    $cs.remove_scenario(scenario)
+      end
 
-  end
+      after do
 
-  describe "perfect reception" do
+        scenario.stop
+        $cs.remove_scenario(scenario)
 
-    it "shall complete" do
-      scenario.device.unconfirmed("hello world")
-    end
+      end
 
-  end
+      describe "perfect reception" do
 
-  describe "drop first attempt" do
+        it "shall complete" do
+          scenario.device.unconfirmed("hello world")
+        end
 
-    # ensure the next packet disappears
-    before do
-      scenario.device.reliability = [0]
-    end
+      end
 
-    after do
-      scenario.device.reliability = nil
-    end
+      describe "drop first attempt" do
 
-    it "shall complete after first attempt" do
-      scenario.device.unconfirmed("hello world")
-    end
+        # ensure the next packet disappears
+        before do
+          scenario.device.reliability = [0]
+        end
 
-    it "shall complete after second attempt" do
-      scenario.device.unconfirmed("hello world", nbTrans: 2)
-    end
+        after do
+          scenario.device.reliability = nil
+        end
 
-  end
+        it "shall complete after first attempt" do
+          scenario.device.unconfirmed("hello world")
+        end
 
-  describe "drop all attempts" do
+        it "shall complete after second attempt" do
+          scenario.device.unconfirmed("hello world", nbTrans: 2)
+        end
 
-    before do
-      scenario.device.reliability = 0
-    end
+      end
 
-    after do
-      scenario.device.reliability = nil
-    end
+      describe "drop all attempts" do
 
-    it "shall complete on first attempt" do
-      scenario.device.unconfirmed("hello world")
-    end
+        before do
+          scenario.device.reliability = 0
+        end
 
-    it "shall complete after multiple attempts" do
-      scenario.device.unconfirmed("hello world", nbTrans: 3)
+        after do
+          scenario.device.reliability = nil
+        end
+
+        it "shall complete on first attempt" do
+          scenario.device.unconfirmed("hello world")
+        end
+
+        it "shall complete after multiple attempts" do
+          scenario.device.unconfirmed("hello world", nbTrans: 3)
+        end
+
+      end
+
     end
 
   end
