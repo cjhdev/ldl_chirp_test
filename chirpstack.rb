@@ -15,7 +15,7 @@ class ChirpStack
   AS_PORT = 8001
   JS_PORT = 8003
 
-  COMPOSE_FILE = File.expand_path(File.join(File.dirname(__FILE__), "compose.yml"))
+  COMPOSE_FILE = File.expand_path(File.join(File.dirname(__FILE__), "docker-compose.yml"))
 
   def self.run(**opts)
 
