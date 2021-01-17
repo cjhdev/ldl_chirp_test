@@ -1,12 +1,10 @@
 require 'sinatra/base'
 require 'sinatra/custom_logger'
-require 'flora'
+require_relative 'security_module'
 
 class JoinServer
 
-  DEV = Struct.new(:dev_eui, :nwk_key, :app_key, :version, :dev_nonce, :join_nonce, keyword_init: true)
-
-
+  SCENARIO = Struct.new(:state, :join_nonce, :version, keyword_init: true)
 
   def initialize(**opts)
 
@@ -15,7 +13,9 @@ class JoinServer
     @port = opts[:port]||8003
     @host = opts[:host]||"0.0.0.0"
 
-    @devices = {}
+    @scenarios = []
+
+    @sm = Flora::SecurityModule.new(logger: @logger)
 
     @app = Sinatra.new do
 
@@ -39,36 +39,18 @@ class JoinServer
 
   end
 
-  def add_device(**opts)
-
-    dev = DEV.new(
-      dev_eui: opts[:dev_eui],
-      nwk_key: opts[:nwk_key],
-      app_key: opts[:app_key],
-      version: 0,
-      join_nonce: 0
-    )
-
-    dev.dev_nonce = opts[:dev_nonce]||0
-
-    @devices[opts[:dev_eui]] = dev
-
-  end
-
-  def remove_device(dev_eui)
-    @devices.delete(dev_eui)
-  end
-
   def add_scenario(scenario)
-    add_device(
-      dev_eui: scenario.device.dev_eui,
-      nwk_key: scenario.device.nwk_key,
-      app_key: scenario.device.app_key
+    @scenarios.push(
+      SCENARIO.new(
+        state: scenario,
+        join_nonce: 0,
+        version: 0
+      )
     )
   end
 
   def remove_scenario(scenario)
-    remove_device(scenario.device.dev_eui)
+    @scenarios.delete_if{|s|s.state == scenario}
   end
 
   def start
@@ -99,15 +81,19 @@ class JoinServer
 
   end
 
+  def lookup_scenario(dev_eui)
+    @scenarios.detect{|s|s.state.device.dev_eui == dev_eui}
+  end
+
   def process_join_request(input)
 
     frame = Flora::FrameDecoder.new(logger: @logger).decode(input["PHYPayload"])
 
     net_id = input["SenderID"]
 
-    device = @devices[frame.dev_eui]
+    s = lookup_scenario(frame.dev_eui)
 
-    if device.nil? or (device.dev_nonce > frame.dev_nonce)
+    if s.nil?
       return {
         ProtocolVersion: input["ProtocolVersion"],
         SenderID: input["receiverID"],
@@ -117,21 +103,9 @@ class JoinServer
       }
     end
 
-    sm = Flora::SecurityModule.new(
-      {
-        nwk: [device.nwk_key].pack("m0"),
-        app: [device.app_key].pack("m0")
-      },
-      logger: @logger
-    )
-
-    sm.derive_keys(device.join_nonce, net_id, frame.dev_nonce)
-
-    device.dev_nonce = frame.dev_nonce
-
     response = Flora::OutputCodec.new.
       put_u8(1 << 5).
-      put_u24(device.join_nonce).
+      put_u24(s.join_nonce).
       put_u24(net_id).
       put_u32(input["DevAddr"]).
       put_u8(input["DLSettings"]).
@@ -156,26 +130,48 @@ class JoinServer
 
     if input["MacVersion"] == "1.1"
 
-      hdr = FLora::OutputCodec.new.put_u8(0xff).put_eui(frame.join_eui).put_u16(frame.dev_nonce).output
+      @sm.derive_keys2(
+        s.state.device.keys[:nwk],
+        s.state.device.keys[:app],
+        s.join_nonce,
+        s.join_eui,
+        frame.dev_nonce,
+        frame.dev_eui
 
-      Flora::OutputCodec.new(response).put_u32(sm.mic(:jsint, hdr, response))
+      ).tap do |keys|
 
-      obj[:SNwkSIntKey] = to_key(sm.get(:snwksint))
-      obj[:FNwkSIntKey] = to_key(sm.get(:fnwksint))
-      obj[:NwkSEncKey] = to_key(sm.get(:nwksenc))
-      obj[:NwkSKey] = to_key(sm.get(:nwks))
-      obj[:AppSKey] = to_key(sm.get(:apps))
+        hdr = Flora::OutputCodec.new.put_u8(0xff).put_eui(frame.join_eui).put_u16(frame.dev_nonce).output
+
+        Flora::OutputCodec.new(response).put_u32(@sm.mic(s.state.device.keys[:jsint], hdr, response))
+
+        obj[:SNwkSIntKey] = to_key(keys[:snwksint])
+        obj[:FNwkSIntKey] = to_key(keys[:fnwksint])
+        obj[:NwkSEncKey] = to_key(keys[:nwksenc])
+        obj[:NwkSKey] = to_key(keys[:nwks])
+        obj[:AppSKey] = to_key(keys[:apps])
+
+      end
 
     else
 
-      Flora::OutputCodec.new(response).put_u32(sm.mic(:nwk, response))
+      @sm.derive_keys(
+        s.state.device.keys[:nwk],
+        s.join_nonce,
+        net_id,
+        frame.dev_nonce
 
-      obj[:NwkSKey] = to_key(sm.get(:fnwksint))
-      obj[:AppSKey] = to_key(sm.get(:apps))
+      ).tap do |keys|
+
+        Flora::OutputCodec.new(response).put_u32(@sm.mic(s.state.device.keys[:nwk], response))
+
+        obj[:NwkSKey] = to_key(keys[:fnwksint])
+        obj[:AppSKey] = to_key(keys[:apps])
+
+      end
 
     end
 
-    response.concat sm.ecb_decrypt(:nwk, response.slice!(1..-1))
+    response.concat @sm.ecb_decrypt(s.state.device.keys[:nwk], response.slice!(1..-1))
 
     obj[:PHYPayload] = to_hex(response)
 

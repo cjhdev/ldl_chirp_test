@@ -16,7 +16,7 @@ describe "otaa" do
 
         $cs.add_scenario(scenario)
         scenario.start
-        sleep 1
+        scenario.device.unlimited_duty_cycle = true
 
       end
 
@@ -66,7 +66,7 @@ describe "otaa" do
         end
 
         it "shall retry until successful" do
-          scenario.device.otaa(timeout: (attempts.size*(dither + cycle_time + 10)))
+          scenario.device.otaa(timeout: (attempts.size*(dither + cycle_time)))
         end
 
       end

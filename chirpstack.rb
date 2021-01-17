@@ -5,6 +5,11 @@ require 'open3'
 require_relative 'join_server'
 require_relative 'app_server'
 
+require_relative 'security_module'
+require_relative 'codec'
+require_relative 'frame_decoder'
+require_relative 'small_event'
+
 class ChirpStack
 
   NS = ChirpStackAPI::NS
@@ -34,12 +39,24 @@ class ChirpStack
 
   end
 
+  def lookup_scenario(dev_eui)
+    @scenarios.detect{|s|s.device.dev_eui == dev_eui}
+  end
+
   def initialize(**opts)
 
     @logger = opts[:logger]||NULL_LOGGER
     @mutex = Mutex.new
 
+    @broker = SmallEvent::Broker.new
+
     @stubs = {}
+
+    @scenarios = []
+
+    @confirmed_downlinks = {}
+
+    @sm = Flora::SecurityModule.new(logger: @logger)
 
     @stubs[:EU_863_870] = NS::NetworkServerService::Stub.new('localhost:9000', :this_channel_is_insecure)
     @stubs[:US_902_928] = NS::NetworkServerService::Stub.new('localhost:9001', :this_channel_is_insecure)
@@ -49,7 +66,63 @@ class ChirpStack
 
     @as = GRPC::RpcServer.new
     @as.add_http2_port("0.0.0.0:#{AS_PORT}", :this_port_is_insecure)
-    @as.handle(AppServer.new)
+    @as.handle(
+      AppServer.new do |m, arg|
+
+        begin
+
+          @logger.info arg
+
+          case m
+          when :handle_downlink_ack
+
+            with_mutex do
+
+              scenario = lookup_scenario(arg.dev_eui)
+
+              dl = @confirmed_downlinks[scenario]
+
+              break unless dl
+
+              item = dl.detect{|m|m[:f_cnt] == arg.f_cnt}
+
+              break unless item
+
+              dl.delete(item)
+
+              unless arg.acknowledged
+
+                stub(scenario).create_device_queue_item(
+                  NS::CreateDeviceQueueItemRequest.new(
+                    item: make_downlink(scenario, item[:port], item[:data], item[:confirmed])
+                  )
+                )
+
+              end
+
+            end
+
+          when :handle_uplink_data
+
+            scenario = @scenarios.detect{|s|s.device.dev_eui == arg.dev_eui}
+
+            break unless scenario
+
+            data = decrypt_upstream(scenario, arg.data, arg.f_cnt) if arg.respond_to? :data
+            port = arg.f_port if arg.respond_to? :f_port
+
+            @broker.publish({data: data, port: port}, arg.dev_eui)
+
+          else
+            @logger.error{"no handler for '#{m}'"}
+          end
+
+        rescue => e
+          @logger.error{e.to_s}
+        end
+
+      end
+    )
 
     @pid = nil
     @stdin = nil
@@ -140,7 +213,7 @@ class ChirpStack
 
       device_profile = NS::DeviceProfile.new(
         id: scenario.device.dev_eui,
-        mac_version: "1.0.3",
+        mac_version: "1.0.4",
         reg_params_revision: "B",
         supports_32bit_f_cnt: true,
         max_eirp: 16,
@@ -169,6 +242,8 @@ class ChirpStack
       stub(scenario).create_device(NS::CreateDeviceRequest.new(device: device))
 
       @js.add_scenario(scenario)
+
+      @scenarios << scenario
 
       sleep 1
 
@@ -203,9 +278,102 @@ class ChirpStack
 
       @js.remove_scenario(scenario)
 
+      @scenarios.delete(scenario)
+
       self
 
     end
+  end
+
+  def init_up_a(dev_addr, counter, i=1)
+
+    Flora::OutputCodec.new.
+      put_u8(1).
+      put_u32(0).
+      put_u8(0).
+      put_u32(dev_addr).
+      put_u32(counter).
+      put_u8(0).
+      put_u8(i).
+      output
+
+  end
+
+   def init_down_a(dev_addr, counter, i=1)
+
+    Flora::OutputCodec.new.
+      put_u8(1).
+      put_u32(0).
+      put_u8(1).
+      put_u32(dev_addr).
+      put_u32(counter).
+      put_u8(0).
+      put_u8(i).
+      output
+
+  end
+
+  def decrypt_upstream(scenario, data, counter)
+    @sm.ctr(scenario.device.keys[:apps], init_up_a(scenario.device.dev_addr, counter), data)
+  end
+
+  def encrypt_downstream(scenario, data, counter)
+    @sm.ctr(scenario.device.keys[:apps], init_down_a(scenario.device.dev_addr, counter), data)
+  end
+
+  def listen(scenario, &block)
+    broker.subscribe scenario.dev_eui, &block
+  end
+
+  def unlisten(block)
+    broker.unsubscribe(block)
+  end
+
+  def next_counter(scenario)
+    stub(scenario).get_next_downlink_f_cnt_for_dev_eui(
+      NS::GetNextDownlinkFCntForDevEUIRequest.new(
+        dev_eui: scenario.device.dev_eui
+      )
+    ).f_cnt
+  end
+
+  def make_downlink(scenario, port, data, confirmed)
+
+    f_cnt = next_counter(scenario)
+
+    NS::DeviceQueueItem.new(
+      dev_eui: scenario.device.dev_eui,
+      frm_payload: encrypt_downstream(scenario, data, f_cnt),
+      f_cnt: f_cnt,
+      f_port: port,
+      confirmed: confirmed,
+      dev_addr: [scenario.device.dev_addr].pack("L>")
+    )
+
+  end
+
+  def send_downlink(scenario, data="", **opts)
+
+    with_mutex do
+
+      confirmed = opts[:confirmed]||false
+      port = opts[:port]||1
+
+      item = make_downlink(scenario, port, data, confirmed)
+
+      if confirmed
+        @confirmed_downlinks[scenario] = [] unless @confirmed_downlinks[scenario]
+        @confirmed_downlinks[scenario] << {port: port, data: data, confirmed: confirmed, f_cnt: item.f_cnt}
+      end
+
+      stub(scenario).create_device_queue_item(
+        NS::CreateDeviceQueueItemRequest.new(
+          item: item
+        )
+      )
+
+    end
+
   end
 
   def stub(scenario)

@@ -14,8 +14,8 @@ describe "confirmed" do
 
         $cs.add_scenario(scenario)
         scenario.start
+        scenario.device.unlimited_duty_cycle = true
         scenario.device.otaa(timeout: 30)
-
       end
 
       after do

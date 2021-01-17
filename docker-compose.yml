@@ -44,19 +44,7 @@ services:
     volumes:
       - ./configuration/postgresql/initdb:/docker-entrypoint-initdb.d
 
-  # network servers ruin the cache for each other so they need
-  # their own dedicated instance
-  redis_eu868:
-    image: redis:5-alpine
-    volumes:
-      - redisdata:/data
-
-  redis_us915:
-    image: redis:5-alpine
-    volumes:
-      - redisdata:/data
-
-  redis_au915:
+  redis:
     image: redis:5-alpine
     volumes:
       - redisdata:/data
