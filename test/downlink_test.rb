@@ -2,7 +2,7 @@ require 'minitest'
 require "minitest/spec"
 require 'ldl'
 
-describe "confirmed" do
+describe "downlink" do
 
   $regions.each do |region|
 

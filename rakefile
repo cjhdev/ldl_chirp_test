@@ -28,11 +28,15 @@ task :test do
     :AU_915_928
   ]
 
+  require_relative 'test/device_time_test'
   require_relative 'test/confirmed_test'
   require_relative 'test/unconfirmed_test'
   require_relative 'test/otaa_test'
   require_relative 'test/adr_test'
   require_relative 'test/downlink_test'
+
+  # slow tests
+  require_relative 'test/otaa_timing_test'
 
   ChirpStack.run(logger: $logger) do |cs|
 

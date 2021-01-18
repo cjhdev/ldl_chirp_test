@@ -322,11 +322,11 @@ class ChirpStack
   end
 
   def listen(scenario, &block)
-    broker.subscribe scenario.dev_eui, &block
+    @broker.subscribe scenario.device.dev_eui, &block
   end
 
   def unlisten(block)
-    broker.unsubscribe(block)
+    @broker.unsubscribe(block)
   end
 
   def next_counter(scenario)

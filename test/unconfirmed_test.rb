@@ -28,8 +28,31 @@ describe "unconfirmed" do
 
       describe "perfect reception" do
 
+        let(:msg){ SecureRandom.bytes(rand(0..5)) }
+        let(:port){ rand(1..100) }
+        let(:result){ TimeoutQueue.new }
+        let(:listener) do
+          $cs.listen(scenario) do |value|
+            result.push(value)
+          end
+        end
+
+        before do
+          listener
+        end
+
+        after do
+          $cs.unlisten(listener)
+        end
+
         it "shall complete" do
-          scenario.device.unconfirmed("hello world")
+
+          scenario.device.unconfirmed(port, msg)
+          value = result.pop(timeout: 0)
+
+          assert_equal port, value[:port]
+          assert_equal msg, value[:data]
+
         end
 
       end
