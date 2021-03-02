@@ -53,7 +53,7 @@ describe "otaa" do
 
       end
 
-      describe "succeed on second attempt" do
+      describe "succeed on second attempt after join request lost" do
 
         let(:attempts){[0,1]}
 
@@ -63,6 +63,24 @@ describe "otaa" do
 
         after do
           scenario.device.reliability = nil
+        end
+
+        it "shall retry until successful" do
+          scenario.device.otaa(timeout: (attempts.size*(dither + cycle_time)))
+        end
+
+      end
+
+      describe "succeed on second attempt after join accept lost" do
+
+        let(:attempts){[0,1]}
+
+        before do
+          scenario.gw.reliability = attempts.dup
+        end
+
+        after do
+          scenario.gw.reliability = nil
         end
 
         it "shall retry until successful" do
