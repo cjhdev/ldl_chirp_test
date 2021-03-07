@@ -30,7 +30,11 @@ describe "otaa" do
       describe "perfect reception" do
 
         it "shall complete on first attempt" do
+
           scenario.device.otaa(timeout: dither + cycle_time)
+
+          assert 1, scenario.device.next_dev_nonce
+
         end
 
       end
@@ -66,7 +70,11 @@ describe "otaa" do
         end
 
         it "shall retry until successful" do
+
           scenario.device.otaa(timeout: (attempts.size*(dither + cycle_time)))
+
+          assert 2, scenario.device.next_dev_nonce
+
         end
 
       end
@@ -84,7 +92,11 @@ describe "otaa" do
         end
 
         it "shall retry until successful" do
+
           scenario.device.otaa(timeout: (attempts.size*(dither + cycle_time)))
+
+          assert 2, scenario.device.next_dev_nonce
+
         end
 
       end
