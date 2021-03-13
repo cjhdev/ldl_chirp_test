@@ -38,6 +38,7 @@ task :test do
   require_relative 'test/otaa_timing_test'
   require_relative 'test/otaa_exhaustion_test'
   require_relative 'test/otaa_join_nonce_test'
+  require_relative 'test/session_restore_test'
 
   ChirpStack.run(logger: $logger) do |cs|
 
